@@ -4,9 +4,8 @@ import os
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import Response, StreamingResponse
 
 from app.agent import run_agent
 from app.mcp_client import MCPClient
@@ -58,12 +57,28 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(","),
-    allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["Content-Type", "Accept"],
-)
+CORS_HEADERS = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "*",
+    "Access-Control-Max-Age": "86400",
+}
+
+
+@app.middleware("http")
+async def cors_middleware(request: Request, call_next):
+    """
+    Simple manual CORS middleware — handles preflight and injects
+    CORS headers on every response. Replaces Starlette CORSMiddleware
+    which has edge-case issues with wildcard origins in 0.38.x.
+    """
+    if request.method == "OPTIONS":
+        return Response(status_code=200, headers=CORS_HEADERS)
+
+    response = await call_next(request)
+    for key, value in CORS_HEADERS.items():
+        response.headers[key] = value
+    return response
 
 
 # ---------------------------------------------------------------------------
@@ -102,6 +117,6 @@ async def chat(req: ChatRequest) -> StreamingResponse:
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",  # disable Nginx buffering if proxied
+            "X-Accel-Buffering": "no",
         },
     )
