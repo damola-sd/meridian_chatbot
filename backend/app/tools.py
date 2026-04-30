@@ -6,7 +6,9 @@ documentation — it tells the model *when* and *how* to use each tool.
 """
 
 TOOLS: list[dict] = [
-----------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Product tools — no authentication required
+    # ------------------------------------------------------------------
     {
         "type": "function",
         "function": {
